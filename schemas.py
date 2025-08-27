@@ -101,3 +101,219 @@ class ErrorResponse(BaseModel):
     model_config = ConfigDict(extra='forbid')
     
     error: str = Field(..., description="Error message describing what went wrong")
+
+
+class QuizQuestion(BaseModel):
+    """
+    Individual quiz question model.
+    
+    Represents a single question with its answer and explanation.
+    """
+    model_config = ConfigDict(extra='forbid')
+    
+    id: int = Field(..., description="Unique identifier for the question (1-10)")
+    question: str = Field(..., description="The quiz question text. Must be descriptive and self-contained. Base questions ONLY on the provided text content - do not add outside knowledge. Vary question difficulty from basic recall to application/analysis. Maximum output is 10 words.")
+    answer: str = Field(..., description="Short correct answer, maximum 6 words.")
+    explanation: str = Field(..., description="Explanation of the correct answer, maximum 20 words.")
+    incorrect_answers: List[str] = Field(..., description="Array of 3 plausible but incorrect answers, each maximum 6 words. These should be believable distractors related to the topic.", min_length=3, max_length=3)
+    other_correct_options: List[str] = Field(..., description="Array of 3 alternative ways to phrase the correct answer, each maximum 6 words. These are acceptable alternative correct answers.", min_length=3, max_length=3)
+
+
+class QuizResponse(BaseModel):
+    """
+    LLM response model for quiz generation (used by OpenAI JSON mode).
+    
+    Contains a list of 10 high-quality questions based on the extracted text.
+    """
+    model_config = ConfigDict(extra='forbid')  # Required for OpenAI structured outputs
+    
+    questions: List[QuizQuestion] = Field(
+        ...,
+        description="List of exactly 10 quiz questions based on the provided text. . Use plain text only - no LaTeX formatting (//, \\\\), no bold markdown (**text**).",
+        min_length=10,
+        max_length=10
+    )
+
+
+# --- Formatted Quiz Output Models ---
+
+class MCQAnswer(BaseModel):
+    """
+    Individual answer option for MCQ format.
+    """
+    model_config = ConfigDict(extra='forbid')
+    
+    answer: str = Field(..., description="The answer option text")
+    correct: bool = Field(..., description="Whether this answer is correct")
+
+
+class MCQQuestion(BaseModel):
+    """
+    Multiple Choice Question format.
+    """
+    model_config = ConfigDict(extra='forbid')
+    
+    question: str = Field(..., description="The question text")
+    answers: List[MCQAnswer] = Field(..., description="List of answer options with correct/incorrect flags")
+    explanation: str = Field(..., description="Explanation of the correct answer")
+
+
+class MCQResponse(BaseModel):
+    """
+    Response model for MCQ formatted quiz.
+    """
+    model_config = ConfigDict(extra='forbid')
+    
+    MCQ: List[MCQQuestion] = Field(..., description="List of multiple choice questions")
+
+
+class QuickQAQuestion(BaseModel):
+    """
+    Quick Q&A Question format.
+    """
+    model_config = ConfigDict(extra='forbid')
+    
+    question: str = Field(..., description="The question text")
+    correct_answer: str = Field(..., description="The correct answer")
+    explanation: str = Field(..., description="Explanation of the correct answer")
+    other_correct_options: List[str] = Field(..., description="Alternative correct answer phrasings")
+
+
+class QuickQAResponse(BaseModel):
+    """
+    Response model for QuickQA formatted quiz.
+    """
+    model_config = ConfigDict(extra='forbid')
+    
+    QuickQA: List[QuickQAQuestion] = Field(..., description="List of quick Q&A questions")
+
+
+class FlashcardQuestion(BaseModel):
+    """
+    Flashcard Question format.
+    """
+    model_config = ConfigDict(extra='forbid')
+    
+    question: str = Field(..., description="The question text")
+    correctanswer: str = Field(..., description="The correct answer")
+    explanation: str = Field(..., description="Explanation of the correct answer")
+
+
+class FlashcardsResponse(BaseModel):
+    """
+    Response model for Flashcards formatted quiz.
+    """
+    model_config = ConfigDict(extra='forbid')
+    
+    Flashcards: List[FlashcardQuestion] = Field(..., description="List of flashcard questions")
+
+
+class AllQuizFormatsResponse(BaseModel):
+    """
+    Combined response model containing all quiz formats.
+    """
+    model_config = ConfigDict(extra='forbid')
+    
+    MCQ: List[MCQQuestion] = Field(..., description="List of multiple choice questions")
+    QuickQA: List[QuickQAQuestion] = Field(..., description="List of quick Q&A questions")
+    Flashcards: List[FlashcardQuestion] = Field(..., description="List of flashcard questions")
+
+
+# --- Quiz Formatting Functions ---
+
+def format_quiz_to_mcq(quiz_response: QuizResponse) -> MCQResponse:
+    """
+    Convert QuizResponse to MCQ format.
+    
+    Takes the raw quiz data and formats it into multiple choice questions
+    where each question has 4 options (1 correct + 3 incorrect).
+    
+    Args:
+        quiz_response: The original quiz response from the AI
+        
+    Returns:
+        MCQResponse: Formatted multiple choice questions
+    """
+    import random
+    
+    mcq_questions = []
+    
+    for q in quiz_response.questions:
+        # Create answer options: 1 correct + 3 incorrect
+        answers = []
+        
+        # Add the correct answer
+        answers.append(MCQAnswer(answer=q.answer, correct=True))
+        
+        # Add the incorrect answers
+        for incorrect in q.incorrect_answers:
+            answers.append(MCQAnswer(answer=incorrect, correct=False))
+        
+        # Shuffle the answers so correct answer isn't always first
+        random.shuffle(answers)
+        
+        # Create MCQ question
+        mcq_question = MCQQuestion(
+            question=q.question,
+            answers=answers,
+            explanation=q.explanation
+        )
+        
+        mcq_questions.append(mcq_question)
+    
+    return MCQResponse(MCQ=mcq_questions)
+
+
+def format_quiz_to_quickqa(quiz_response: QuizResponse) -> QuickQAResponse:
+    """
+    Convert QuizResponse to QuickQA format.
+    
+    Takes the raw quiz data and formats it into quick Q&A structure
+    with question, correct answer, explanation, and other correct options.
+    
+    Args:
+        quiz_response: The original quiz response from the AI
+        
+    Returns:
+        QuickQAResponse: Formatted quick Q&A questions
+    """
+    quickqa_questions = []
+    
+    for q in quiz_response.questions:
+        quickqa_question = QuickQAQuestion(
+            question=q.question,
+            correct_answer=q.answer,
+            explanation=q.explanation,
+            other_correct_options=q.other_correct_options
+        )
+        
+        quickqa_questions.append(quickqa_question)
+    
+    return QuickQAResponse(QuickQA=quickqa_questions)
+
+
+def format_quiz_to_flashcards(quiz_response: QuizResponse) -> FlashcardsResponse:
+    """
+    Convert QuizResponse to Flashcards format.
+    
+    Takes the raw quiz data and formats it into flashcard structure
+    with question, correct answer, and explanation.
+    
+    Args:
+        quiz_response: The original quiz response from the AI
+        
+    Returns:
+        FlashcardsResponse: Formatted flashcard questions
+    """
+    flashcard_questions = []
+    
+    for q in quiz_response.questions:
+        flashcard_question = FlashcardQuestion(
+            question=q.question,
+            correctanswer=q.answer,
+            explanation=q.explanation
+        )
+        
+        flashcard_questions.append(flashcard_question)
+    
+    return FlashcardsResponse(Flashcards=flashcard_questions)

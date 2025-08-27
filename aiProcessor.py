@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from typing import Union, Tuple
 
 # Import our Pydantic response schemas for structured AI outputs
-from schemas import SummaryResponse, ConceptExplanationResponse, ErrorResponse
+from schemas import SummaryResponse, ConceptExplanationResponse, QuizResponse, ErrorResponse, AllQuizFormatsResponse, format_quiz_to_mcq,format_quiz_to_quickqa,format_quiz_to_flashcards
 
 # Load environment variables from a .env file
 # Ensure you have created a .env file with your OPENAI_API_KEY
@@ -50,6 +50,16 @@ Focus on being practical and actionable. Make the explanations clear enough for 
 
 Return your response as a valid JSON object matching the required schema.
 """
+
+# Quiz Generation Prompt - Used for creating quiz questions from extracted text
+QUIZ_PROMPT = """
+You are a patient teacher whose goal is to help the student gain a clear and good overall understanding of the text. 
+
+Task: Create a pool of 10 high-quality questions based ONLY on the provided text. These 10 questions should attempt to cover all key concepts and flows within the text so that the student gets a complete picture.
+
+Return your response as a valid JSON object matching the required schema.
+"""
+
 
 def extract_text_from_image(image_bytes: bytes) -> str:
     """
@@ -205,5 +215,86 @@ def process_explanations_pipeline(text_id: str) -> Union[ConceptExplanationRespo
     
     extracted_text = extracted_text_storage[text_id]
     return generate_explanations(extracted_text)
+
+
+def generate_quiz(extracted_text: str) -> Union[QuizResponse, ErrorResponse]:
+    """
+    Generate quiz questions from extracted text content using GPT-4 with JSON mode.
+    
+    This function uses the QuizResponse Pydantic model to ensure structured output
+    and validate the AI's response format for quiz generation.
+    
+    Args:
+        text: The extracted text content from the image processing stage
+        
+    Returns:
+        QuizResponse: Contains list of 10 quiz questions with answers and explanations
+        ErrorResponse: If generation fails or validation errors occur
+    """
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            temperature=0.4,
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"{QUIZ_PROMPT}\n\nHere is the study material content:\n{extracted_text}"
+                }
+            ],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "quiz_response",
+                    "schema": QuizResponse.model_json_schema(),
+                    "strict": True,
+                },
+            },
+        )
+        
+        # Parse and validate using Pydantic model
+        response_data = json.loads(response.choices[0].message.content)
+        return QuizResponse(**response_data)
+        
+    except ValidationError as ve:
+        print(f"Validation error: {ve}")
+        return ErrorResponse(error="The AI response format is invalid. Please try again.")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return ErrorResponse(error="An error occurred while generating quiz questions.")
+
+
+def process_quiz_pipeline(text_id: str) -> Union[AllQuizFormatsResponse, ErrorResponse]:
+    """
+    Pipeline for generating quiz questions in all formats from already extracted text using text_id.
+    Returns MCQ, QuickQA, and Flashcards formats in one combined response.
+    """
+    if text_id not in extracted_text_storage:
+        return ErrorResponse(error="Text ID not found. Please process the image first.")
+    
+    extracted_text = extracted_text_storage[text_id]
+    quizResponse = generate_quiz(extracted_text)
+    
+    # Check if quiz generation failed
+    if isinstance(quizResponse, ErrorResponse):
+        return quizResponse
+    
+    try:
+        # Generate all three formats
+        mcqResponse = format_quiz_to_mcq(quizResponse)
+        quickQAResponse = format_quiz_to_quickqa(quizResponse)
+        flashcardsResponse = format_quiz_to_flashcards(quizResponse)
+        
+        # Combine all formats into one response
+        combined_response = AllQuizFormatsResponse(
+            MCQ=mcqResponse.MCQ,
+            QuickQA=quickQAResponse.QuickQA,
+            Flashcards=flashcardsResponse.Flashcards
+        )
+        
+        return combined_response
+        
+    except Exception as e:
+        print(f"Error formatting quiz responses: {e}")
+        return ErrorResponse(error="An error occurred while formatting the quiz into different formats.")
 
 
