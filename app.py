@@ -4,18 +4,18 @@ from typing import Union
 from pydantic import BaseModel
 import uvicorn
 
-# Import the core AI processing function and schemas
+# Import the core AI processing functions and response schemas
 from aiProcessor import process_image_pipeline, process_explanations_pipeline
 from schemas import SummaryResponse, SummaryWithIdResponse, ConceptExplanationResponse, ErrorResponse
 
-# Request model for explanations endpoint
+# Request model for the explanations endpoint
 class ExplanationsRequest(BaseModel):
     text_id: str
 
 # --- FastAPI App Initialization ---
 app = FastAPI(
     title="AI Study Helper API",
-    description="An API that uses GPT-4 Vision to generate summaries, explanations, and quizzes from images.",
+    description="An API that uses GPT-4 Vision to extract text from images and generate summaries, explanations, and study guidance.",
     version="1.0.0"
 )
 
@@ -32,15 +32,16 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
-# TODO:Add image type and size validations by referring to OPEN AI documentation
-# --- API Endpoint Definition ---
+# TODO: Add image type and size validations by referring to OpenAI documentation
+# --- Image Processing Endpoint ---
 @app.post("/api/process-image/", response_model=Union[SummaryWithIdResponse, ErrorResponse])
 async def create_upload_file(file: UploadFile = File(...)):
     """
-    This endpoint receives an image file, processes it using the AI,
-    and returns the structured study helper content.
+    This endpoint receives an image file, extracts text using GPT-4 Vision,
+    generates a comprehensive summary, and returns it along with a text_id
+    for future explanations generation.
     """
-    print("Received image fi:", file.filename)
+    print("Received image file:", file.filename)
     # Ensure the uploaded file is an image
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File provided is not an image.")
@@ -49,48 +50,49 @@ async def create_upload_file(file: UploadFile = File(...)):
         # Read the contents of the uploaded file into bytes
         image_bytes = await file.read()
 
-        # Call the function that interacts with the GPT-4 API
+        # Call the image processing pipeline that extracts text and generates summary
         result, text_id = process_image_pipeline(image_bytes)
 
         # Check if the result is an ErrorResponse
         if isinstance(result, ErrorResponse):
             raise HTTPException(status_code=500, detail=result.error)
 
-        # Create a new SummaryWithIdResponse with the text_id included
+        # Create a response object that includes both summary and text_id
         response_with_id = SummaryWithIdResponse(
             summary=result.summary,
             text_id=text_id
         )
         
-        # Return the successful validated response with text_id
+        # Return the successful response with text_id for future explanations
         return response_with_id
 
     except Exception as e:
-        # Catch any other unexpected errors during file processing or the API call
-        print(f"An error occurred in the endpoint: {e}")
+        # Catch any other unexpected errors during file processing or AI processing
+        print(f"An error occurred in the image processing endpoint: {e}")
         raise HTTPException(status_code=500, detail="An internal server error occurred.")
 
-# --- Explanations Endpoint ---
+# --- Explanations Generation Endpoint ---
 @app.post("/api/generate-explanations/", response_model=Union[ConceptExplanationResponse, ErrorResponse])
 async def generate_explanations(request: ExplanationsRequest):
     """
-    This endpoint generates concept explanations, study tips, and learning approaches
-    from previously extracted text using the text_id.
+    This endpoint generates detailed concept explanations, study tips, and learning approaches
+    from previously extracted text using the text_id obtained from the image processing endpoint.
+    This avoids reprocessing the same image and provides faster responses.
     """
     try:
-        # Call the function that generates explanations
+        # Call the explanations pipeline using the stored extracted text
         result = process_explanations_pipeline(request.text_id)
 
         # Check if the result is an ErrorResponse
         if isinstance(result, ErrorResponse):
             raise HTTPException(status_code=500, detail=result.error)
 
-        # Return the successful validated response
+        # Return the successful explanations response
         return result
 
     except Exception as e:
-        # Catch any other unexpected errors
-        print(f"An error occurred in the explanations endpoint: {e}")
+        # Catch any other unexpected errors during explanations generation
+        print(f"An error occurred in the explanations generation endpoint: {e}")
         raise HTTPException(status_code=500, detail="An internal server error occurred.")
 
 # --- Health Check Endpoint ---

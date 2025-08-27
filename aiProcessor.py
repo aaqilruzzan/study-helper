@@ -7,39 +7,44 @@ from dotenv import load_dotenv
 from pydantic import ValidationError
 from typing import Union, Tuple
 
-# Import our Pydantic schemas
+# Import our Pydantic response schemas for structured AI outputs
 from schemas import SummaryResponse, ConceptExplanationResponse, ErrorResponse
 
 # Load environment variables from a .env file
-# Make sure to create a .env file with your OPENAI_API_KEY
+# Ensure you have created a .env file with your OPENAI_API_KEY
 load_dotenv()
 
-# --- Configuration ---
-# It's best practice to use environment variables for API keys
-# to avoid hardcoding them in your source code.
+# --- OpenAI Configuration ---
+# Using environment variables for API keys follows security best practices
+# and prevents accidental exposure of sensitive credentials in source code
 API_KEY = os.getenv("OPENAI_API_KEY")
 if not API_KEY:
     raise ValueError("OPENAI_API_KEY not found in environment variables. Please set it in your .env file.")
 
-# Initialize the OpenAI client
+# Initialize the OpenAI client for GPT-4 Vision API calls
 client = OpenAI(api_key=API_KEY)
 
-# Simple in-memory storage for extracted text (in production, use a proper database)
+# In-memory storage for extracted text content (use Redis/database in production)
+# This allows reusing extracted text for multiple operations without reprocessing images
 extracted_text_storage = {}
 
-# --- The Mega Prompt ---
-# Updated prompt for JSON mode - cleaner and more direct
+# --- AI Prompts for Different Processing Stages ---
+
+# Summary Generation Prompt - Used for initial text extraction and summarization
 MEGA_PROMPT = """
 You are a friendly and encouraging AI tutor. A student has uploaded an image of their study material to help them prepare for a test. Your goal is to transform the extracted content into a powerful and easy-to-understand study guide.
-
 
 Return your response as a valid JSON object matching the required schema.
 """
 
-# --- Explanations Prompt ---
-# Prompt specifically for generating concept explanations, study tips, and learning approaches
+# Explanations Generation Prompt - Used for detailed concept breakdowns and study guidance
 EXPLANATIONS_PROMPT = """
 You are an expert AI tutor. Based on the provided study material content, generate detailed explanations and study guidance.
+
+Your task:
+1. **Explanations**: Identify up to 5 key concepts from the content and explain them in simple, easy-to-understand language
+2. **Study Tips**: Provide 4 practical study techniques specifically tailored to this content 
+3. **Learning Approaches**: Suggest 4 specific approaches for different learning styles (Visual, Kinesthetic, Auditory, Reading/Writing)
 
 Focus on being practical and actionable. Make the explanations clear enough for any student to understand.
 
@@ -48,15 +53,26 @@ Return your response as a valid JSON object matching the required schema.
 
 def extract_text_from_image(image_bytes: bytes) -> str:
     """
-    Extract and explain the image content using GPT-4o-mini.
-    The model should act like a teacher, breaking down and explaining
-    all details in the image clearly and thoroughly.
+    Extract and comprehensively explain image content using GPT-4 Vision.
+    
+    This function acts as the first stage of the pipeline, where the AI:
+    - Analyzes the uploaded image (notes, diagrams, textbook pages, etc.)
+    - Extracts all text, equations, concepts, and visual elements
+    - Provides detailed explanations as if teaching a student
+    - Preserves technical terminology and mathematical notation
+    
+    Args:
+        image_bytes: Raw bytes of the uploaded image file
+        
+    Returns:
+        str: Comprehensive text explanation of the image content
     """
+    # Encode image to base64 format required by OpenAI Vision API
     base64_image = base64.b64encode(image_bytes).decode("utf-8")
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
-        temperature=0.2,  # allow slightly richer explanations
+        temperature=0.2,  # Low temperature for consistent, factual explanations
         messages=[
             {
                 "role": "user",
