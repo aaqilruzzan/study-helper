@@ -148,3 +148,93 @@ const result = await response.json();
 ```
 
 ---
+
+### 3. Generate Quiz Questions (All Formats)
+
+**Endpoint:** `POST /api/generate-quiz/`
+
+**Description:** Generate quiz questions in multiple formats (MCQ, QuickQA, and Flashcards) from previously extracted text using the text_id from the image processing step.
+
+**Request:**
+
+- **Method:** POST
+- **Content-Type:** `application/json`
+- **Body:** JSON with text_id
+
+**Request Example (JavaScript):**
+
+```javascript
+const response = await fetch("/api/generate-quiz/", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    text_id: "abc123def456", // Use text_id from previous response
+  }),
+});
+
+const result = await response.json();
+```
+
+**Success Response (200):**
+
+```json
+{
+  "MCQ": [
+    {
+      "question": "What is the primary function of chlorophyll in photosynthesis?",
+      "answers": [
+        {
+          "answer": "Absorb light energy",
+          "correct": true
+        },
+        {
+          "answer": "Store water",
+          "correct": false
+        },
+        {
+          "answer": "Release oxygen",
+          "correct": false
+        },
+        {
+          "answer": "Break down glucose",
+          "correct": false
+        }
+      ],
+      "explanation": "Chlorophyll captures sunlight and converts it into chemical energy for the plant to use."
+    }
+  ],
+  "QuickQA": [
+    {
+      "question": "What is the primary function of chlorophyll in photosynthesis?",
+      "correct_answer": "Absorb light energy",
+      "explanation": "Chlorophyll captures sunlight and converts it into chemical energy for the plant to use.",
+      "other_correct_options": [
+        "Capture sunlight",
+        "Convert light energy",
+        "Harvest light"
+      ]
+    }
+  ],
+  "Flashcards": [
+    {
+      "question": "What is the primary function of chlorophyll in photosynthesis?",
+      "correctanswer": "Absorb light energy",
+      "explanation": "Chlorophyll captures sunlight and converts it into chemical energy for the plant to use."
+    }
+  ]
+}
+```
+
+**Note:** The response includes exactly 10 questions in each format with varying difficulty levels from basic recall to application/analysis.
+
+**Error Response (500):**
+
+```json
+{
+  "error": "Text ID not found. Please process the image first."
+}
+```
+
+---

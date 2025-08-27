@@ -5,11 +5,15 @@ from pydantic import BaseModel
 import uvicorn
 
 # Import the core AI processing functions and response schemas
-from aiProcessor import process_image_pipeline, process_explanations_pipeline
-from schemas import SummaryResponse, SummaryWithIdResponse, ConceptExplanationResponse, ErrorResponse
+from aiProcessor import process_image_pipeline, process_explanations_pipeline, process_quiz_pipeline
+from schemas import SummaryResponse, SummaryWithIdResponse, ConceptExplanationResponse,ErrorResponse,AllQuizFormatsResponse
 
 # Request model for the explanations endpoint
 class ExplanationsRequest(BaseModel):
+    text_id: str
+
+# Request model for the quiz generation endpoint
+class QuizRequest(BaseModel):
     text_id: str
 
 # --- FastAPI App Initialization ---
@@ -138,6 +142,30 @@ async def generate_explanations(request: ExplanationsRequest):
     except Exception as e:
         # Catch any other unexpected errors during explanations generation
         print(f"An error occurred in the explanations generation endpoint: {e}")
+        raise HTTPException(status_code=500, detail="An internal server error occurred.")
+
+# --- Quiz Generation Endpoint ---
+@app.post("/api/generate-quiz/", response_model=Union[AllQuizFormatsResponse, ErrorResponse])
+async def generate_quiz(request: QuizRequest):
+    """
+    This endpoint generates quiz questions from previously extracted text using the text_id 
+    obtained from the image processing endpoint. Creates 10 questions with answers and explanations
+    based on the content of the processed study material.
+    """
+    try:
+        # Call the quiz generation pipeline using the stored extracted text
+        result = process_quiz_pipeline(request.text_id)
+
+        # Check if the result is an ErrorResponse
+        if isinstance(result, ErrorResponse):
+            raise HTTPException(status_code=500, detail=result.error)
+
+        # Return the successful quiz response
+        return result
+
+    except Exception as e:
+        # Catch any other unexpected errors during quiz generation
+        print(f"An error occurred in the quiz generation endpoint: {e}")
         raise HTTPException(status_code=500, detail="An internal server error occurred.")
 
 # --- Health Check Endpoint ---
