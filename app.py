@@ -40,16 +40,61 @@ async def create_upload_file(file: UploadFile = File(...)):
     This endpoint receives an image file, extracts text using GPT-4 Vision,
     generates a comprehensive summary, and returns it along with a text_id
     for future explanations generation.
+    
+    Validation rules:
+    - Maximum file size: 10MB
+    - Supported formats: PNG, JPEG, WEBP, non-animated GIF
     """
     print("Received image file:", file.filename)
-    # Ensure the uploaded file is an image
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="File provided is not an image.")
+    
+    # Define validation constants
+    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB in bytes
+    ALLOWED_CONTENT_TYPES = {
+        "image/png",
+        "image/jpeg", 
+        "image/jpg",
+        "image/webp",
+        "image/gif"
+    }
+    ALLOWED_EXTENSIONS = {".png", ".jpeg", ".jpg", ".webp", ".gif"}
+    
+    # Validate file content type
+    if not file.content_type or file.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Unsupported file type. Allowed types: PNG, JPEG, WEBP, GIF. Received: {file.content_type}"
+        )
+    
+    # Validate file extension (additional check)
+    if file.filename:
+        file_extension = file.filename.lower().split('.')[-1]
+        if f".{file_extension}" not in ALLOWED_EXTENSIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file extension. Allowed extensions: {', '.join(ALLOWED_EXTENSIONS)}"
+            )
+    
+    # Read file content to check size
+    image_bytes = await file.read()
+    file_size = len(image_bytes)
+    
+    # Validate file size
+    if file_size > MAX_FILE_SIZE:
+        file_size_mb = file_size / (1024 * 1024)
+        raise HTTPException(
+            status_code=400,
+            detail=f"File size too large. Maximum allowed: 10MB. Your file: {file_size_mb:.2f}MB"
+        )
+    
+    # Additional check for minimum file size (avoid empty files)
+    if file_size < 1024:  # Less than 1KB
+        raise HTTPException(
+            status_code=400,
+            detail="File too small. Please upload a valid image file."
+        )
 
     try:
-        # Read the contents of the uploaded file into bytes
-        image_bytes = await file.read()
-
+        # File content is already read during validation, so we can use image_bytes directly
         # Call the image processing pipeline that extracts text and generates summary
         result, text_id = process_image_pipeline(image_bytes)
 

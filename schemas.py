@@ -22,8 +22,8 @@ class ConceptExplanation(BaseModel):
     """
     model_config = ConfigDict(extra='forbid')  # Prevents additional fields for strict OpenAI compliance
     
-    concept: str = Field(..., description="The key concept being explained. Example: 'Photosynthesis' or 'Newton's First Law'")
-    explanation: str = Field(..., description="Simple explanation of the concept in easy-to-understand language. Example: 'The process by which plants convert sunlight into energy' or 'An object at rest stays at rest unless acted upon by a force'")
+    concept: str = Field(..., description="The key concept being explained. Example: 'Photosynthesis' or 'Newton's First Law'. Use plain text only - no LaTeX (//, \\\\), no bold markdown (**text**).")
+    explanation: str = Field(..., description="Simple explanation of the concept in easy-to-understand language. Example: 'The process by which plants convert sunlight into energy' or 'An object at rest stays at rest unless acted upon by a force'. Use plain text only - no LaTeX (//, \\\\), no bold markdown (**text**).")
 
 
 # TODO: Ensure formula formatting - remove LaTeX //s and bold **s from AI responses
@@ -43,7 +43,8 @@ class SummaryResponse(BaseModel):
             "Do not just summarize or point out topics—break down every concept, definition, equation, "
             "and example step by step. Preserve all technical details from the text while making it "
             "easy to understand, as if explaining to a student. "
-            "Keep the output to a maximum of 100 words."
+            "Keep the output to a maximum of 100 words. "
+            "IMPORTANT: Use plain text only - no LaTeX formatting (//, \\\\), no bold markdown (**text**), "
         )
     )
 
@@ -72,19 +73,19 @@ class ConceptExplanationResponse(BaseModel):
     
     explanations: List[ConceptExplanation] = Field(
         ..., 
-        description="List of key concepts and their explanations. Each should have a 'concept' (the key term) and 'explanation' (simple definition).",
+        description="List of key concepts and their explanations. Each should have a 'concept' (the key term) and 'explanation' (simple definition). Use plain text only - no LaTeX or markdown formatting.",
         min_length=1,
         max_length=5
     )
     studyTips: List[str] = Field(
         ..., 
-        description="List of 4 practical study techniques specific to the content. Format examples: 'Use active recall techniques', 'Create concept maps', 'Practice spaced repetition', 'Teach concepts to others' Limit each output to 4 words",
+        description="List of 4 practical study techniques specific to the content. Format examples: 'Use active recall techniques', 'Create concept maps', 'Practice spaced repetition', 'Teach concepts to others' Limit each output to 4 words. Use plain text only - no formatting symbols.",
         min_length=4,
         max_length=4
     )
     learningApproaches: List[str] = Field(
         ..., 
-        description="List of 4 learning approaches for different learning styles. Format examples: 'Visual learners: Use diagrams', 'Kinesthetic: Practice exercises', 'Auditory: Discuss concepts', 'Reading/Writing: Take notes' Limit each output to 4 words",
+        description="List of 4 learning approaches for different learning styles. Format examples: 'Visual learners: Use diagrams', 'Kinesthetic: Practice exercises', 'Auditory: Discuss concepts', 'Reading/Writing: Take notes' Limit each output to 4 words. Use plain text only - no formatting symbols.",
         min_length=4,
         max_length=4
     )
