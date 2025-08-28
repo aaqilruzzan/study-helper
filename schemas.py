@@ -219,6 +219,43 @@ class AllQuizFormatsResponse(BaseModel):
     Flashcards: List[FlashcardQuestion] = Field(..., description="List of flashcard questions")
 
 
+# --- Notes Generation Models ---
+
+class Note(BaseModel):
+    """
+    Individual note model for study notes generation.
+    """
+    model_config = ConfigDict(extra='forbid')
+    
+    title: str = Field(..., description="Title of the note section. Maximum output is 3 words.")
+    subject: str = Field(..., description="Subject or topic area of the note. Maximum output is 3 words.")
+    description: str = Field(..., description="Brief description of what the note covers. Maximum output is 17 words.")
+    content: str = Field(..., description="The main content of the note, Maximum output is 100 words.")
+    keyPoints: List[str] = Field(..., description="List of key points or concepts covered in this note. Per output maximum is 5 words", min_length=3, max_length=6)
+    difficulty: str = Field(..., description="Difficulty level: 'Beginner', 'Intermediate', or 'Advanced'")
+    estimatedTime: str = Field(..., description="Estimated reading time (e.g., '15 min read')")
+    lastUpdated: str = Field(..., description="When the note was last updated (e.g., '2 days ago')")
+
+
+class NotesResponse(BaseModel):
+    """
+    Response model for notes generation containing 2 generated notes.
+    """
+    model_config = ConfigDict(extra='forbid')
+    
+    notes: List[Note] = Field(..., description="List of exactly 2 generated study notes. Use plain text only - no LaTeX formatting (//, \\\\), no bold markdown (**text**).", min_length=2, max_length=2)
+
+
+class NotesWithIdResponse(BaseModel):
+    """
+    API response model that wraps the notes with the text_id as id.
+    """
+    model_config = ConfigDict(extra='forbid')
+    
+    id: str = Field(..., description="The text_id used to generate these notes")
+    notes: List[Note] = Field(..., description="List of exactly 2 generated study notes", min_length=2, max_length=2)
+    
+
 # --- Quiz Formatting Functions ---
 
 def format_quiz_to_mcq(quiz_response: QuizResponse) -> MCQResponse:
