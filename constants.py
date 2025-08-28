@@ -14,7 +14,7 @@ ALLOWED_EXTENSIONS = {".png", ".jpeg", ".jpg", ".webp", ".gif"}
 # Image Processing Prompt - Used for extracting and explaining image content
 IMAGE_PROCESSING_PROMPT = """Look at this image and explain everything it contains as if you are teaching it to a student. Do not just summarize or list topics—break it down step by step, clearly explaining concepts, definitions, equations, diagrams, and examples exactly as they appear in the image. Preserve all concepts, technical terms, details, and equations. Avoid outside knowledge—only explain what is in the image itself. Your output should feel like a teacher walking through the material, not a summary\n\n.
 
-⚠️ Important: Only if the image cannot be processed at all (because of lack of visibility, unreadable quality, or irrelevant non-study content), then respond with exactly this JSON structure and nothing else:
+⚠️ Important: Only if the image cannot be processed at all (because of lack of visibility or unreadable quality), then respond with exactly this JSON structure and nothing else:
 {"error": "IMAGE_PROCESSING_ERROR", "message": "Image cannot be processed due to lack of visibility, poor image quality, or irrelevant content that is not study material. Please try again with a clearer image of study materials."}"""
 
 # Summary Generation Prompt - Used for creating study guide summaries
