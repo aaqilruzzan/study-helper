@@ -277,6 +277,7 @@ const result = await response.json();
       "title": "Mathematical Foundations",
       "subject": "Calculus",
       "description": "Core concepts of differential and integral calculus explained through visual examples and real-world applications.",
+      "content": "Calculus is a branch of mathematics that deals with rates of change and areas under curves. The fundamental concepts include derivatives, which measure how functions change at specific points, and integrals, which calculate accumulated quantities like areas and volumes. The Fundamental Theorem of Calculus elegantly connects these two concepts, showing that differentiation and integration are inverse operations. These mathematical tools are essential for understanding motion, optimization problems, and modeling real-world phenomena in physics, engineering, and economics.",
       "keyPoints": [
         "Derivatives measure rates of change",
         "Integrals calculate areas under curves",
@@ -291,6 +292,7 @@ const result = await response.json();
       "title": "Problem Solving Techniques",
       "subject": "Mathematics",
       "description": "Systematic approaches to solving complex mathematical problems using step-by-step methodologies.",
+      "content": "Effective problem solving in mathematics requires a structured approach that breaks complex problems into manageable steps. Start by carefully reading and understanding what the problem is asking, then identify the given information and what needs to be found. Look for patterns, relationships, and connections to previously learned concepts. Use visual representations like diagrams, graphs, or tables to organize information. Apply appropriate mathematical methods and formulas, then verify your solution by checking if it makes sense in the context of the original problem.",
       "keyPoints": [
         "Break complex problems into steps",
         "Identify patterns and relationships",
