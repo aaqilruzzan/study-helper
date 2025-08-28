@@ -106,10 +106,6 @@ async def create_upload_file(file: UploadFile = File(...)):
         # Call the image processing pipeline that extracts text and generates summary
         result, text_id = process_image_pipeline(image_bytes)
 
-        # Check if the result is an ErrorResponse
-        if isinstance(result, ErrorResponse):
-            raise HTTPException(status_code=500, detail=result.error)
-
         # Create a response object that includes both summary and text_id
         response_with_id = SummaryWithIdResponse(
             summary=result.summary,
@@ -120,6 +116,10 @@ async def create_upload_file(file: UploadFile = File(...)):
         return response_with_id
 
     except Exception as e:
+         # Check if the result is an ErrorResponse
+        if isinstance(result, ErrorResponse):
+            # Raise HTTP 500 with the specific error message
+            raise HTTPException(status_code=500, detail=result.error)
         # Catch any other unexpected errors during file processing or AI processing
         print(f"An error occurred in the image processing endpoint: {e}")
         raise HTTPException(status_code=500, detail="An internal server error occurred.")

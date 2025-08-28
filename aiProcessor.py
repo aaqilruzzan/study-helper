@@ -79,47 +79,65 @@ def extract_text_from_image(image_bytes: bytes) -> str:
     - Extracts all text, equations, concepts, and visual elements
     - Provides detailed explanations as if teaching a student
     - Preserves technical terminology and mathematical notation
+    - Returns structured error message if image is unreadable or irrelevant
     
     Args:
         image_bytes: Raw bytes of the uploaded image file
         
     Returns:
-        str: Comprehensive text explanation of the image content
+        str: Comprehensive text explanation of the image content or structured error message
     """
-    # Encode image to base64 format required by OpenAI Vision API
-    base64_image = base64.b64encode(image_bytes).decode("utf-8")
+    try:
+        # Encode image to base64 format required by OpenAI Vision API
+        base64_image = base64.b64encode(image_bytes).decode("utf-8")
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        temperature=0.2,  # Low temperature for consistent, factual explanations
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": (
-                            "Look at this image and explain everything it contains as if you are "
-                            "teaching it to a student. Do not just summarize or list topics—break it down "
-                            "step by step, clearly explaining concepts, definitions, equations, diagrams, "
-                            "and examples exactly as they appear in the image. Preserve all concepts, technical terms, "
-                            "details and equations. "
-                            "Avoid outside knowledge—only explain what is in the image itself. "
-                            "Your output should feel like a teacher walking through the material, "
-                            "not a summary."
-                        )
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
-                    },
-                ],
-            }
-        ],
-    )
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            temperature=0.2,  # Low temperature for consistent, factual explanations
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                "Look at this image and explain everything it contains as if you are "
+                                "teaching it to a student. Do not just summarize or list topics—break it down "
+                                "step by step, clearly explaining concepts, definitions, equations, diagrams, "
+                                "and examples exactly as they appear in the image. Preserve all concepts, technical terms, "
+                                "details and equations. "
+                                "Avoid outside knowledge—only explain what is in the image itself. "
+                                "Your output should feel like a teacher walking through the material, "
+                                "not a summary."
+                                "However, if the image:\n"
+                                    "- Is too blurry, dark, or unclear to read properly\n"
+                                    "- Contains no text or educational content\n"
+                                    "- Shows irrelevant content (photos, random objects, non-academic material)\n"
+                                    "- Cannot be processed due to poor image quality\n\n"
+                                    "Then respond with exactly this JSON structure:\n"
+                                    '{"error": "IMAGE_PROCESSING_ERROR", "message": "Image cannot be processed due to lack of visibility, poor image quality, or irrelevant content that is not study material. Please try again with a clearer image of study materials."}'
+                            )
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
+                        },
+                    ],
+                }
+            ],
+        )
 
-    explained_text = response.choices[0].message.content.strip()
-    return explained_text
+        explained_text = response.choices[0].message.content.strip()
+        return explained_text
+        
+    except Exception as e:
+        print(f"Error in extract_text_from_image: {e}")
+        # Return a structured error message if something goes wrong
+        error_response = {
+            "error": "IMAGE_PROCESSING_ERROR",
+            "message": "Image cannot be processed due to technical issues. Please try again with a different image."
+        }
+        return json.dumps(error_response)
 
 
 
@@ -251,9 +269,20 @@ def process_image_pipeline(image_bytes: bytes) -> Tuple[Union[SummaryResponse, E
     """
     Complete pipeline: OCR extraction → Summary generation.
     Returns tuple of (response, text_id) for later use.
+    Handles image processing errors and returns appropriate error responses.
     """
     extracted_text = extract_text_from_image(image_bytes)
     print("Extracted text from OCR:\n", extracted_text[:300], "...")  # Preview first 300 chars
+    
+    # Check if the extracted text is an error response
+    try:
+        parsed_response = json.loads(extracted_text)
+        if parsed_response.get("error") == "IMAGE_PROCESSING_ERROR":
+            # Return the error message from the image processing
+            return ErrorResponse(error=parsed_response.get("message", "Image processing failed")), ""
+    except json.JSONDecodeError:
+        # Not JSON, so it's normal text content - continue processing
+        pass
     
     # Generate a unique ID for this extracted text
     text_id = hashlib.md5(extracted_text.encode()).hexdigest()[:16]
