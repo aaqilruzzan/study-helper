@@ -7,72 +7,31 @@ from dotenv import load_dotenv
 from pydantic import ValidationError
 from typing import Union, Tuple
 
-# Import our Pydantic response schemas for structured AI outputs
+# Importing Pydantic response schemas for structured AI outputs
 from schemas import SummaryResponse, ConceptExplanationResponse, QuizResponse, ErrorResponse, AllQuizFormatsResponse, NotesResponse, NotesWithIdResponse, format_quiz_to_mcq,format_quiz_to_quickqa,format_quiz_to_flashcards
 
-# Load environment variables from a .env file
-# Ensure you have created a .env file with your OPENAI_API_KEY
+# Importing AI prompts from constants
+from constants import IMAGE_PROCESSING_PROMPT, MEGA_PROMPT, EXPLANATIONS_PROMPT, QUIZ_PROMPT, NOTES_PROMPT
+
+# Loading environment variables from a .env file
 load_dotenv()
 
 # --- OpenAI Configuration ---
-# Using environment variables for API keys follows security best practices
-# and prevents accidental exposure of sensitive credentials in source code
 API_KEY = os.getenv("OPENAI_API_KEY")
 if not API_KEY:
     raise ValueError("OPENAI_API_KEY not found in environment variables. Please set it in your .env file.")
 
-# Initialize the OpenAI client for GPT-4 Vision API calls
+# Initialize the OpenAI client for GPT-4o-mini API calls
 client = OpenAI(api_key=API_KEY)
 
-# In-memory storage for extracted text content (use Redis/database in production)
+# In-memory storage for extracted text content
 # This allows reusing extracted text for multiple operations without reprocessing images
 extracted_text_storage = {}
-
-# --- AI Prompts for Different Processing Stages ---
-
-# Summary Generation Prompt - Used for initial text extraction and summarization
-MEGA_PROMPT = """
-You are a friendly and encouraging AI tutor. A student has uploaded an image of their study material to help them prepare for a test. Your goal is to transform the extracted content into a powerful and easy-to-understand study guide.
-
-Return your response as a valid JSON object matching the required schema.
-"""
-
-# Explanations Generation Prompt - Used for detailed concept breakdowns and study guidance
-EXPLANATIONS_PROMPT = """
-You are an expert AI tutor. Based on the provided study material content, generate detailed explanations and study guidance.
-
-Your task:
-1. **Explanations**: Identify up to 5 key concepts from the content and explain them in simple, easy-to-understand language
-2. **Study Tips**: Provide 4 practical study techniques specifically tailored to this content 
-3. **Learning Approaches**: Suggest 4 specific approaches for different learning styles (Visual, Kinesthetic, Auditory, Reading/Writing)
-
-Focus on being practical and actionable. Make the explanations clear enough for any student to understand.
-
-Return your response as a valid JSON object matching the required schema.
-"""
-
-# Quiz Generation Prompt - Used for creating quiz questions from extracted text
-QUIZ_PROMPT = """
-You are a patient teacher whose goal is to help the student gain a clear and good overall understanding of the text. 
-
-Task: Create a pool of 10 high-quality questions based ONLY on the provided text. These 10 questions should attempt to cover all key concepts and flows within the text so that the student gets a complete picture.
-
-Return your response as a valid JSON object matching the required schema.
-"""
-
-
-ADDITIONAL_CONTENT_PROMPT = """
-You are a patient teacher whose goal is to help the student gain a clear and good overall understanding of the text. 
-
-Task: Create 2 high-quality notes based ONLY on the provided text. These 2 notes should attempt to cover some key concepts and flows within the text so that the student can review them later effectively for important memory retention.
-
-Return your response as a valid JSON object matching the required schema.
-"""
 
 
 def extract_text_from_image(image_bytes: bytes) -> str:
     """
-    Extract and comprehensively explain image content using GPT-4 Vision.
+    Extract and comprehensively explain image content using GPT-4o-mini.
     
     This function acts as the first stage of the pipeline, where the AI:
     - Analyzes the uploaded image (notes, diagrams, textbook pages, etc.)
@@ -88,7 +47,7 @@ def extract_text_from_image(image_bytes: bytes) -> str:
         str: Comprehensive text explanation of the image content or structured error message
     """
     try:
-        # Encode image to base64 format required by OpenAI Vision API
+        # Encoding image to base64 format required by OpenAI Vision API
         base64_image = base64.b64encode(image_bytes).decode("utf-8")
 
         response = client.chat.completions.create(
@@ -100,20 +59,7 @@ def extract_text_from_image(image_bytes: bytes) -> str:
             "content": [
                 {
                     "type": "text",
-                    "text": (
-                        "Look at this image and explain everything it contains as if you are "
-                        "teaching it to a student. Do not just summarize or list topics—break it down "
-                        "step by step, clearly explaining concepts, definitions, equations, diagrams, "
-                        "and examples exactly as they appear in the image. Preserve all concepts, "
-                        "technical terms, details, and equations. "
-                        "Avoid outside knowledge—only explain what is in the image itself. "
-                        "Your output should feel like a teacher walking through the material, "
-                        "not a summary.\n\n"
-                        "⚠️ Important: Only if the image cannot be processed at all "
-                        "(because of lack of visibility, unreadable quality, or irrelevant non-study content), "
-                        "then respond with exactly this JSON structure and nothing else:\n"
-                        '{"error": "IMAGE_PROCESSING_ERROR", "message": "Image cannot be processed due to lack of visibility, poor image quality, or irrelevant content that is not study material. Please try again with a clearer image of study materials."}'
-                    )
+                    "text": IMAGE_PROCESSING_PROMPT
                 },
                 {
                     "type": "image_url",
@@ -129,7 +75,7 @@ def extract_text_from_image(image_bytes: bytes) -> str:
         
     except Exception as e:
         print(f"Error in extract_text_from_image: {e}")
-        # Return a structured error message if something goes wrong
+
         error_response = {
             "error": "IMAGE_PROCESSING_ERROR",
             "message": "Image cannot be processed due to technical issues. Please try again with a different image."
@@ -140,7 +86,7 @@ def extract_text_from_image(image_bytes: bytes) -> str:
 
 def generate_summary(extracted_text: str) -> Union[SummaryResponse, ErrorResponse]:
     """
-    Second call: Use extracted OCR text and transform it into a structured study guide.
+    Second call: Using extracted OCR text and transforming it into a structured study guide.
     """
     try:
         response = client.chat.completions.create(
@@ -178,7 +124,7 @@ def generate_summary(extracted_text: str) -> Union[SummaryResponse, ErrorRespons
 
 def generate_explanations(extracted_text: str) -> Union[ConceptExplanationResponse, ErrorResponse]:
     """
-    Generate concept explanations, study tips, and learning approaches from extracted text.
+    Generating concept explanations, study tips, and learning approaches from extracted text.
     """
     try:
         response = client.chat.completions.create(
@@ -216,7 +162,7 @@ def generate_explanations(extracted_text: str) -> Union[ConceptExplanationRespon
 
 def generate_notes(extracted_text: str) -> Union[NotesResponse, ErrorResponse]:
     """
-    Generate structured study notes from extracted text content using GPT-4 with JSON mode.
+    Generating structured study notes from extracted text content using GPT-4o-mini with JSON mode.
     
     This function uses the NotesResponse Pydantic model to ensure structured output
     and validate the AI's response format for notes generation.
@@ -235,7 +181,7 @@ def generate_notes(extracted_text: str) -> Union[NotesResponse, ErrorResponse]:
             messages=[
                 {
                     "role": "user",
-                    "content": f"{ADDITIONAL_CONTENT_PROMPT}\n\nHere is the study material content:\n{extracted_text}"
+                    "content": f"{NOTES_PROMPT}\n\nHere is the study material content:\n{extracted_text}"
                 }
             ],
             response_format={
@@ -271,17 +217,16 @@ def process_image_pipeline(image_bytes: bytes) -> Tuple[Union[SummaryResponse, E
     extracted_text = extract_text_from_image(image_bytes)
     print("Extracted text from OCR:\n", extracted_text[:300], "...")  # Preview first 300 chars
     
-    # Check if the extracted text is an error response
+    # Checking if the extracted text is an error response
     try:
         parsed_response = json.loads(extracted_text)
         if parsed_response.get("error") == "IMAGE_PROCESSING_ERROR":
-            # Return the error message from the image processing
             return ErrorResponse(error=parsed_response.get("message", "Image processing failed")), ""
     except json.JSONDecodeError:
         # Not JSON, so it's normal text content - continue processing
         pass
     
-    # Generate a unique ID for this extracted text
+    # Generating a unique ID for this extracted text
     text_id = hashlib.md5(extracted_text.encode()).hexdigest()[:16]
     extracted_text_storage[text_id] = extracted_text
     
@@ -311,11 +256,9 @@ def process_notes_pipeline(text_id: str) -> Union[NotesWithIdResponse, ErrorResp
     extracted_text = extracted_text_storage[text_id]
     notes_result = generate_notes(extracted_text)
     
-    # Check if notes generation failed
     if isinstance(notes_result, ErrorResponse):
         return notes_result
     
-    # Wrap the notes with the text_id as id
     notes_with_id = NotesWithIdResponse(
         id=text_id,
         notes=notes_result.notes
@@ -326,8 +269,8 @@ def process_notes_pipeline(text_id: str) -> Union[NotesWithIdResponse, ErrorResp
 
 def generate_quiz(extracted_text: str) -> Union[QuizResponse, ErrorResponse]:
     """
-    Generate quiz questions from extracted text content using GPT-4 with JSON mode.
-    
+    Generating quiz questions from extracted text content using GPT-4o-mini with JSON mode.
+
     This function uses the QuizResponse Pydantic model to ensure structured output
     and validate the AI's response format for quiz generation.
     
@@ -381,17 +324,16 @@ def process_quiz_pipeline(text_id: str) -> Union[AllQuizFormatsResponse, ErrorRe
     extracted_text = extracted_text_storage[text_id]
     quizResponse = generate_quiz(extracted_text)
     
-    # Check if quiz generation failed
     if isinstance(quizResponse, ErrorResponse):
         return quizResponse
     
     try:
-        # Generate all three formats
+        # Generating all three formats
         mcqResponse = format_quiz_to_mcq(quizResponse)
         quickQAResponse = format_quiz_to_quickqa(quizResponse)
         flashcardsResponse = format_quiz_to_flashcards(quizResponse)
-        
-        # Combine all formats into one response
+
+        # Combining all formats into one response
         combined_response = AllQuizFormatsResponse(
             MCQ=mcqResponse.MCQ,
             QuickQA=quickQAResponse.QuickQA,
