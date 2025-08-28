@@ -67,9 +67,31 @@ const result = await response.json();
 
 **Error Response (400/500):**
 
+**File Validation Errors (400):**
+
 ```json
 {
-  "error": "File provided is not an image."
+  "detail": "Unsupported file type. Allowed types: PNG, JPEG, WEBP, GIF"
+}
+```
+
+```json
+{
+  "detail": "File size too large. Maximum allowed: 10MB. Your file: 15.32MB"
+}
+```
+
+**Image Processing Errors (500):**
+
+```json
+{
+  "detail": "Image cannot be processed due to lack of visibility, poor image quality, or irrelevant content that is not study material. Please try again with a clearer image of study materials."
+}
+```
+
+```json
+{
+  "detail": "Image cannot be processed due to technical issues. Please try again with a different image."
 }
 ```
 
