@@ -238,3 +238,81 @@ const result = await response.json();
 ```
 
 ---
+
+### 4. Generate Study Notes
+
+**Endpoint:** `POST /api/generate-notes/`
+
+**Description:** Generate structured study notes from previously extracted text using the text_id from the image processing step. Creates exactly 2 comprehensive study notes with metadata including difficulty, key points, and estimated reading time.
+
+**Request:**
+
+- **Method:** POST
+- **Content-Type:** `application/json`
+- **Body:** JSON with text_id
+
+**Request Example (JavaScript):**
+
+```javascript
+const response = await fetch("/api/generate-notes/", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    text_id: "abc123def456", // Use text_id from previous response
+  }),
+});
+
+const result = await response.json();
+```
+
+**Success Response (200):**
+
+```json
+{
+  "id": "abc123def456",
+  "notes": [
+    {
+      "title": "Mathematical Foundations",
+      "subject": "Calculus",
+      "description": "Core concepts of differential and integral calculus explained through visual examples and real-world applications.",
+      "keyPoints": [
+        "Derivatives measure rates of change",
+        "Integrals calculate areas under curves",
+        "Fundamental theorem connects both concepts",
+        "Applications in physics and engineering"
+      ],
+      "difficulty": "Intermediate",
+      "estimatedTime": "15 min read",
+      "lastUpdated": "2 days ago"
+    },
+    {
+      "title": "Problem Solving Techniques",
+      "subject": "Mathematics",
+      "description": "Systematic approaches to solving complex mathematical problems using step-by-step methodologies.",
+      "keyPoints": [
+        "Break complex problems into steps",
+        "Identify patterns and relationships",
+        "Use visual representations effectively",
+        "Verify solutions through substitution"
+      ],
+      "difficulty": "Advanced",
+      "estimatedTime": "20 min read",
+      "lastUpdated": "1 day ago"
+    }
+  ]
+}
+```
+
+**Note:** The response includes exactly 2 structured study notes with comprehensive metadata for effective learning organization.
+
+**Error Response (500):**
+
+```json
+{
+  "error": "Text ID not found. Please process the image first."
+}
+```
+
+---

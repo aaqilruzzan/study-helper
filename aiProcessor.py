@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from typing import Union, Tuple
 
 # Import our Pydantic response schemas for structured AI outputs
-from schemas import SummaryResponse, ConceptExplanationResponse, QuizResponse, ErrorResponse, AllQuizFormatsResponse, format_quiz_to_mcq,format_quiz_to_quickqa,format_quiz_to_flashcards
+from schemas import SummaryResponse, ConceptExplanationResponse, QuizResponse, ErrorResponse, AllQuizFormatsResponse, NotesResponse, NotesWithIdResponse, format_quiz_to_mcq,format_quiz_to_quickqa,format_quiz_to_flashcards
 
 # Load environment variables from a .env file
 # Ensure you have created a .env file with your OPENAI_API_KEY
@@ -56,6 +56,15 @@ QUIZ_PROMPT = """
 You are a patient teacher whose goal is to help the student gain a clear and good overall understanding of the text. 
 
 Task: Create a pool of 10 high-quality questions based ONLY on the provided text. These 10 questions should attempt to cover all key concepts and flows within the text so that the student gets a complete picture.
+
+Return your response as a valid JSON object matching the required schema.
+"""
+
+
+ADDITIONAL_CONTENT_PROMPT = """
+You are a patient teacher whose goal is to help the student gain a clear and good overall understanding of the text. 
+
+Task: Create 2 high-quality notes based ONLY on the provided text. These 2 notes should attempt to cover some key concepts and flows within the text so that the student can review them later effectively for important memory retention.
 
 Return your response as a valid JSON object matching the required schema.
 """
@@ -190,6 +199,54 @@ def generate_explanations(extracted_text: str) -> Union[ConceptExplanationRespon
         return ErrorResponse(error="An error occurred while generating explanations.")
 
 
+def generate_notes(extracted_text: str) -> Union[NotesResponse, ErrorResponse]:
+    """
+    Generate structured study notes from extracted text content using GPT-4 with JSON mode.
+    
+    This function uses the NotesResponse Pydantic model to ensure structured output
+    and validate the AI's response format for notes generation.
+    
+    Args:
+        extracted_text: The extracted text content from the image processing stage
+        
+    Returns:
+        NotesResponse: Contains exactly 2 structured study notes with metadata
+        ErrorResponse: If generation fails or validation errors occur
+    """
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            temperature=0.4,
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"{ADDITIONAL_CONTENT_PROMPT}\n\nHere is the study material content:\n{extracted_text}"
+                }
+            ],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "notes_response",
+                    "schema": NotesResponse.model_json_schema(),
+                    "strict": True,
+                },
+            },
+        )
+
+        json_string = response.choices[0].message.content
+
+        parsed_json = json.loads(json_string)
+        validated_response = NotesResponse(**parsed_json)
+        return validated_response
+
+    except ValidationError as ve:
+        print(f"Validation error: {ve}")
+        return ErrorResponse(error="The AI response format is invalid. Please try again.")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return ErrorResponse(error="An error occurred while generating notes.")
+
+
 def process_image_pipeline(image_bytes: bytes) -> Tuple[Union[SummaryResponse, ErrorResponse], str]:
     """
     Complete pipeline: OCR extraction → Summary generation.
@@ -215,6 +272,30 @@ def process_explanations_pipeline(text_id: str) -> Union[ConceptExplanationRespo
     
     extracted_text = extracted_text_storage[text_id]
     return generate_explanations(extracted_text)
+
+
+def process_notes_pipeline(text_id: str) -> Union[NotesWithIdResponse, ErrorResponse]:
+    """
+    Pipeline for generating structured notes from already extracted text using text_id.
+    Returns the notes with the text_id as the id field.
+    """
+    if text_id not in extracted_text_storage:
+        return ErrorResponse(error="Text ID not found. Please process the image first.")
+    
+    extracted_text = extracted_text_storage[text_id]
+    notes_result = generate_notes(extracted_text)
+    
+    # Check if notes generation failed
+    if isinstance(notes_result, ErrorResponse):
+        return notes_result
+    
+    # Wrap the notes with the text_id as id
+    notes_with_id = NotesWithIdResponse(
+        id=text_id,
+        notes=notes_result.notes
+    )
+    
+    return notes_with_id
 
 
 def generate_quiz(extracted_text: str) -> Union[QuizResponse, ErrorResponse]:

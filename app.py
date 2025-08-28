@@ -5,8 +5,8 @@ from pydantic import BaseModel
 import uvicorn
 
 # Import the core AI processing functions and response schemas
-from aiProcessor import process_image_pipeline, process_explanations_pipeline, process_quiz_pipeline
-from schemas import SummaryResponse, SummaryWithIdResponse, ConceptExplanationResponse,ErrorResponse,AllQuizFormatsResponse
+from aiProcessor import process_image_pipeline, process_explanations_pipeline, process_quiz_pipeline, process_notes_pipeline
+from schemas import SummaryResponse, SummaryWithIdResponse, ConceptExplanationResponse, NotesWithIdResponse, ErrorResponse, AllQuizFormatsResponse
 
 # Request model for the explanations endpoint
 class ExplanationsRequest(BaseModel):
@@ -14,6 +14,10 @@ class ExplanationsRequest(BaseModel):
 
 # Request model for the quiz generation endpoint
 class QuizRequest(BaseModel):
+    text_id: str
+
+# Request model for the notes generation endpoint
+class NotesRequest(BaseModel):
     text_id: str
 
 # --- FastAPI App Initialization ---
@@ -166,6 +170,30 @@ async def generate_quiz(request: QuizRequest):
     except Exception as e:
         # Catch any other unexpected errors during quiz generation
         print(f"An error occurred in the quiz generation endpoint: {e}")
+        raise HTTPException(status_code=500, detail="An internal server error occurred.")
+
+# --- Notes Generation Endpoint ---
+@app.post("/api/generate-notes/", response_model=Union[NotesWithIdResponse, ErrorResponse])
+async def generate_notes(request: NotesRequest):
+    """
+    This endpoint generates structured study notes from previously extracted text using the text_id 
+    obtained from the image processing endpoint. Creates exactly 2 comprehensive study notes
+    with metadata including difficulty, key points, and estimated reading time.
+    """
+    try:
+        # Call the notes generation pipeline using the stored extracted text
+        result = process_notes_pipeline(request.text_id)
+
+        # Check if the result is an ErrorResponse
+        if isinstance(result, ErrorResponse):
+            raise HTTPException(status_code=500, detail=result.error)
+
+        # Return the successful notes response
+        return result
+
+    except Exception as e:
+        # Catch any other unexpected errors during notes generation
+        print(f"An error occurred in the notes generation endpoint: {e}")
         raise HTTPException(status_code=500, detail="An internal server error occurred.")
 
 # --- Health Check Endpoint ---
