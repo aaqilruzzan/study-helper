@@ -8,7 +8,7 @@ A FastAPI-based service that uses GPT-4 Vision to extract text from study materi
 
 ```
 http://localhost:8000 - local
-https://study-helper-5bl7.onrender.com - hosted
+https://study-helper-sdzh.onrender.com - hosted
 
 ```
 
