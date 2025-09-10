@@ -67,9 +67,31 @@ const result = await response.json();
 
 **Error Response (400/500):**
 
+**File Validation Errors (400):**
+
 ```json
 {
-  "error": "File provided is not an image."
+  "detail": "Unsupported file type. Allowed types: PNG, JPEG, WEBP, GIF"
+}
+```
+
+```json
+{
+  "detail": "File size too large. Maximum allowed: 10MB. Your file: 15.32MB"
+}
+```
+
+**Image Processing Errors (500):**
+
+```json
+{
+  "detail": "Image cannot be processed due to lack of visibility, poor image quality, or irrelevant content that is not study material. Please try again with a clearer image of study materials."
+}
+```
+
+```json
+{
+  "detail": "Image cannot be processed due to technical issues. Please try again with a different image."
 }
 ```
 
@@ -228,6 +250,86 @@ const result = await response.json();
 ```
 
 **Note:** The response includes exactly 10 questions in each format with varying difficulty levels from basic recall to application/analysis.
+
+**Error Response (500):**
+
+```json
+{
+  "error": "Text ID not found. Please process the image first."
+}
+```
+
+---
+
+### 4. Generate Study Notes
+
+**Endpoint:** `POST /api/generate-notes/`
+
+**Description:** Generate structured study notes from previously extracted text using the text_id from the image processing step. Creates exactly 2 comprehensive study notes with metadata including difficulty, key points, and estimated reading time.
+
+**Request:**
+
+- **Method:** POST
+- **Content-Type:** `application/json`
+- **Body:** JSON with text_id
+
+**Request Example (JavaScript):**
+
+```javascript
+const response = await fetch("/api/generate-notes/", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    text_id: "abc123def456", // Use text_id from previous response
+  }),
+});
+
+const result = await response.json();
+```
+
+**Success Response (200):**
+
+```json
+{
+  "id": "abc123def456",
+  "notes": [
+    {
+      "title": "Mathematical Foundations",
+      "subject": "Calculus",
+      "description": "Core concepts of differential and integral calculus explained through visual examples and real-world applications.",
+      "content": "Calculus is a branch of mathematics that deals with rates of change and areas under curves. The fundamental concepts include derivatives, which measure how functions change at specific points, and integrals, which calculate accumulated quantities like areas and volumes. The Fundamental Theorem of Calculus elegantly connects these two concepts, showing that differentiation and integration are inverse operations. These mathematical tools are essential for understanding motion, optimization problems, and modeling real-world phenomena in physics, engineering, and economics.",
+      "keyPoints": [
+        "Derivatives measure rates of change",
+        "Integrals calculate areas under curves",
+        "Fundamental theorem connects both concepts",
+        "Applications in physics and engineering"
+      ],
+      "difficulty": "Intermediate",
+      "estimatedTime": "15 min read",
+      "lastUpdated": "2 days ago"
+    },
+    {
+      "title": "Problem Solving Techniques",
+      "subject": "Mathematics",
+      "description": "Systematic approaches to solving complex mathematical problems using step-by-step methodologies.",
+      "content": "Effective problem solving in mathematics requires a structured approach that breaks complex problems into manageable steps. Start by carefully reading and understanding what the problem is asking, then identify the given information and what needs to be found. Look for patterns, relationships, and connections to previously learned concepts. Use visual representations like diagrams, graphs, or tables to organize information. Apply appropriate mathematical methods and formulas, then verify your solution by checking if it makes sense in the context of the original problem.",
+      "keyPoints": [
+        "Break complex problems into steps",
+        "Identify patterns and relationships",
+        "Use visual representations effectively",
+        "Verify solutions through substitution"
+      ],
+      "difficulty": "Advanced",
+      "estimatedTime": "20 min read",
+      "lastUpdated": "1 day ago"
+    }
+  ]
+}
+```
+
+**Note:** The response includes exactly 2 structured study notes with comprehensive metadata for effective learning organization.
 
 **Error Response (500):**
 

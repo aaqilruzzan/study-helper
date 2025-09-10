@@ -12,6 +12,17 @@ Uses Pydantic v2 with ConfigDict for strict schema validation required by OpenAI
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List
 
+# Request model for the explanations endpoint
+class ExplanationsRequest(BaseModel):
+    text_id: str
+
+# Request model for the quiz generation endpoint
+class QuizRequest(BaseModel):
+    text_id: str
+
+# Request model for the notes generation endpoint
+class NotesRequest(BaseModel):
+    text_id: str
 
 class ConceptExplanation(BaseModel):
     """
@@ -26,7 +37,6 @@ class ConceptExplanation(BaseModel):
     explanation: str = Field(..., description="Simple explanation of the concept in easy-to-understand language. Example: 'The process by which plants convert sunlight into energy' or 'An object at rest stays at rest unless acted upon by a force'. Use plain text only - no LaTeX (//, \\\\), no bold markdown (**text**).")
 
 
-# TODO: Ensure formula formatting - remove LaTeX //s and bold **s from AI responses
 class SummaryResponse(BaseModel):
     """
     LLM response model for summary generation (used by OpenAI JSON mode).
@@ -219,11 +229,48 @@ class AllQuizFormatsResponse(BaseModel):
     Flashcards: List[FlashcardQuestion] = Field(..., description="List of flashcard questions")
 
 
+# --- Notes Generation Models ---
+
+class Note(BaseModel):
+    """
+    Individual note model for study notes generation.
+    """
+    model_config = ConfigDict(extra='forbid')
+    
+    title: str = Field(..., description="Title of the note section. Maximum output is 3 words.")
+    subject: str = Field(..., description="Subject or topic area of the note. Maximum output is 3 words.")
+    description: str = Field(..., description="Brief description of what the note covers. Maximum output is 17 words.")
+    content: str = Field(..., description="The main content of the note, Maximum output is 100 words.")
+    keyPoints: List[str] = Field(..., description="List of key points or concepts covered in this note. Per output maximum is 5 words", min_length=3, max_length=6)
+    difficulty: str = Field(..., description="Difficulty level: 'Beginner', 'Intermediate', or 'Advanced'")
+    estimatedTime: str = Field(..., description="Estimated reading time (e.g., '15 min read')")
+    lastUpdated: str = Field(..., description="When the note was last updated (e.g., '2 days ago')")
+
+
+class NotesResponse(BaseModel):
+    """
+    Response model for notes generation containing 2 generated notes.
+    """
+    model_config = ConfigDict(extra='forbid')
+    
+    notes: List[Note] = Field(..., description="List of exactly 2 generated study notes. Use plain text only - no LaTeX formatting (//, \\\\), no bold markdown (**text**).", min_length=2, max_length=2)
+
+
+class NotesWithIdResponse(BaseModel):
+    """
+    API response model that wraps the notes with the text_id as id.
+    """
+    model_config = ConfigDict(extra='forbid')
+    
+    id: str = Field(..., description="The text_id used to generate these notes")
+    notes: List[Note] = Field(..., description="List of exactly 2 generated study notes", min_length=2, max_length=2)
+    
+
 # --- Quiz Formatting Functions ---
 
 def format_quiz_to_mcq(quiz_response: QuizResponse) -> MCQResponse:
     """
-    Convert QuizResponse to MCQ format.
+    Converting QuizResponse to MCQ format.
     
     Takes the raw quiz data and formats it into multiple choice questions
     where each question has 4 options (1 correct + 3 incorrect).
@@ -239,20 +286,20 @@ def format_quiz_to_mcq(quiz_response: QuizResponse) -> MCQResponse:
     mcq_questions = []
     
     for q in quiz_response.questions:
-        # Create answer options: 1 correct + 3 incorrect
+        # Creating answer options: 1 correct + 3 incorrect
         answers = []
         
-        # Add the correct answer
+        # Adding the correct answer
         answers.append(MCQAnswer(answer=q.answer, correct=True))
         
-        # Add the incorrect answers
+        # Adding the incorrect answers
         for incorrect in q.incorrect_answers:
             answers.append(MCQAnswer(answer=incorrect, correct=False))
-        
-        # Shuffle the answers so correct answer isn't always first
+
+        # Shuffling the answers so correct answer isn't always first
         random.shuffle(answers)
         
-        # Create MCQ question
+        # Creating MCQ question
         mcq_question = MCQQuestion(
             question=q.question,
             answers=answers,
@@ -266,7 +313,7 @@ def format_quiz_to_mcq(quiz_response: QuizResponse) -> MCQResponse:
 
 def format_quiz_to_quickqa(quiz_response: QuizResponse) -> QuickQAResponse:
     """
-    Convert QuizResponse to QuickQA format.
+    Converting QuizResponse to QuickQA format.
     
     Takes the raw quiz data and formats it into quick Q&A structure
     with question, correct answer, explanation, and other correct options.
@@ -294,7 +341,7 @@ def format_quiz_to_quickqa(quiz_response: QuizResponse) -> QuickQAResponse:
 
 def format_quiz_to_flashcards(quiz_response: QuizResponse) -> FlashcardsResponse:
     """
-    Convert QuizResponse to Flashcards format.
+    Converting QuizResponse to Flashcards format.
     
     Takes the raw quiz data and formats it into flashcard structure
     with question, correct answer, and explanation.
